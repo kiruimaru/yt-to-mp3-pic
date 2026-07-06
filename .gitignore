@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Скачанные файлы
+downloads/
+*.mp3
+*.jpg
+*.webp
+
+# Системное
+.DS_Store
+Thumbs.db
