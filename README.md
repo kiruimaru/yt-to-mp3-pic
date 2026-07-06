@@ -1,3 +1,5 @@
+<img width="642" height="532" alt="image" src="https://github.com/user-attachments/assets/bede6015-c2a5-4b98-be4b-1f1658aff824" />
+
 # YouTube → MP3
 
 Скачивает аудио из видео на YouTube, конвертирует в MP3 и сохраняет обложку.
