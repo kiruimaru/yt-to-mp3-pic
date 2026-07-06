@@ -19,18 +19,51 @@ YouTube -> MP3 + обложка (версия для командной стро
 """
 
 import argparse
+import importlib
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-try:
-    import yt_dlp
-except ImportError:
-    sys.exit(
-        "Не найден модуль yt-dlp. Установите его командой:\n"
-        "    pip install yt-dlp"
-    )
+
+def ensure_deps() -> None:
+    """
+    Проверяем, что нужные пакеты установлены. Чего нет — ставим через pip
+    в текущее окружение. Так вручную ничего докачивать не нужно.
+    """
+    required = [
+        ("yt-dlp", "yt_dlp"),
+        ("imageio-ffmpeg", "imageio_ffmpeg"),
+    ]
+    missing = []
+    for pip_name, module_name in required:
+        try:
+            importlib.import_module(module_name)
+        except ImportError:
+            missing.append(pip_name)
+
+    if not missing:
+        return
+
+    print(f"Устанавливаю недостающие пакеты: {', '.join(missing)} ...")
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--upgrade", *missing]
+        )
+    except subprocess.CalledProcessError as e:
+        sys.exit(
+            "Не удалось установить зависимости автоматически.\n"
+            f"Попробуйте вручную:\n    {sys.executable} -m pip install "
+            + " ".join(missing)
+            + f"\n\nОшибка: {e}"
+        )
+    importlib.invalidate_caches()
+
+
+ensure_deps()
+
+import yt_dlp  # noqa: E402 — импортируем уже после установки
 
 
 def find_ffmpeg():
