@@ -6,6 +6,7 @@ YouTube -> MP3 + обложка. Простой графический инте�
   - поле для вставки URL видео
   - кнопка выбора папки для сохранения
   - выбор битрейта MP3
+  - переключатель языка интерфейса (RU / EN)
   - кнопка "Скачать" и индикатор прогресса
   - лог того, что происходит
 
@@ -68,7 +69,10 @@ def ensure_deps() -> None:
     importlib.invalidate_caches()
 
 
-ensure_deps()
+# Внутри собранного .exe зависимости уже упакованы, а pip недоступен —
+# поэтому авто-установку запускаем только при обычном запуске из исходников.
+if not getattr(sys, "frozen", False):
+    ensure_deps()
 
 import yt_dlp  # noqa: E402 — импортируем уже после установки
 
@@ -111,6 +115,79 @@ DARK = {
     "accent": "#89b4fa",    # акцент (кнопка, прогресс)
     "accent_hi": "#a6c8ff", # акцент при наведении
     "border": "#45475a",    # рамки
+}
+
+
+# ---------- тексты интерфейса на двух языках ----------
+TEXTS = {
+    "ru": {
+        "title": "YouTube -> MP3",
+        "lang_label": "Язык:",
+        "url_label": "Ссылка на видео:",
+        "dir_label": "Папка для сохранения:",
+        "browse": "Обзор...",
+        "quality_label": "Качество (kbps):",
+        "download": "Скачать",
+        "downloading": "Скачивание...",
+        "progress_label": "Ход выполнения:",
+        "no_url_title": "Нет ссылки",
+        "no_url_msg": "Вставьте ссылку на видео.",
+        "no_dir_title": "Нет папки",
+        "no_dir_msg": "Выберите папку для сохранения.",
+        "no_ffmpeg_title": "Нет ffmpeg",
+        "no_ffmpeg_msg": (
+            "Не найден ffmpeg — он нужен для конвертации в MP3.\n\n"
+            "Обычно он ставится автоматически вместе с зависимостями.\n"
+            "Если нет — установите вручную:\n"
+            "    pip install imageio-ffmpeg\n\n"
+            "Либо системный ffmpeg:\n"
+            "Windows: скачайте с gyan.dev/ffmpeg и добавьте в PATH.\n"
+            "macOS: brew install ffmpeg\n"
+            "Linux: sudo apt install ffmpeg"
+        ),
+        "converting": "Загрузка завершена, конвертирую в MP3...",
+        "done_log": "Готово: {title}",
+        "saved_to": "Файлы сохранены в: {dir}",
+        "done_title": "Готово",
+        "done_msg": "Скачано и сохранено:\n{title}",
+        "error_log": "Ошибка: {msg}",
+        "error_title": "Ошибка",
+        "video_word": "видео",
+    },
+    "en": {
+        "title": "YouTube -> MP3",
+        "lang_label": "Language:",
+        "url_label": "Video URL:",
+        "dir_label": "Save to folder:",
+        "browse": "Browse...",
+        "quality_label": "Quality (kbps):",
+        "download": "Download",
+        "downloading": "Downloading...",
+        "progress_label": "Progress:",
+        "no_url_title": "No link",
+        "no_url_msg": "Paste a video URL.",
+        "no_dir_title": "No folder",
+        "no_dir_msg": "Choose a folder to save to.",
+        "no_ffmpeg_title": "ffmpeg not found",
+        "no_ffmpeg_msg": (
+            "ffmpeg was not found — it is required to convert to MP3.\n\n"
+            "It normally installs automatically with the dependencies.\n"
+            "If not, install it manually:\n"
+            "    pip install imageio-ffmpeg\n\n"
+            "Or a system ffmpeg:\n"
+            "Windows: download from gyan.dev/ffmpeg and add it to PATH.\n"
+            "macOS: brew install ffmpeg\n"
+            "Linux: sudo apt install ffmpeg"
+        ),
+        "converting": "Download finished, converting to MP3...",
+        "done_log": "Done: {title}",
+        "saved_to": "Files saved to: {dir}",
+        "done_title": "Done",
+        "done_msg": "Downloaded and saved:\n{title}",
+        "error_log": "Error: {msg}",
+        "error_title": "Error",
+        "video_word": "video",
+    },
 }
 
 
@@ -171,9 +248,10 @@ def apply_dark_theme(root: tk.Tk) -> None:
 class DownloaderApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.title("YouTube -> MP3")
-        self.root.geometry("640x460")
-        self.root.minsize(560, 420)
+        self.lang = "ru"  # язык по умолчанию
+
+        self.root.geometry("640x500")
+        self.root.minsize(560, 460)
 
         apply_dark_theme(self.root)
 
@@ -182,7 +260,12 @@ class DownloaderApp:
         self.is_downloading = False
 
         self._build_ui()
+        self._apply_language()
         self._poll_queue()
+
+    def t(self, key: str) -> str:
+        """Короткий доступ к тексту на текущем языке."""
+        return TEXTS[self.lang][key]
 
     # ---------- построение интерфейса ----------
     def _build_ui(self) -> None:
@@ -191,21 +274,39 @@ class DownloaderApp:
         frm.pack(fill="both", expand=True)
         frm.columnconfigure(1, weight=1)
 
+        # Переключатель языка (верхний правый угол)
+        self.lang_label = ttk.Label(frm)
+        self.lang_label.grid(row=0, column=0, sticky="w", **pad)
+        self.lang_var = tk.StringVar(value="Русский")
+        self.lang_combo = ttk.Combobox(
+            frm,
+            textvariable=self.lang_var,
+            values=["Русский", "English"],
+            state="readonly",
+            width=12,
+        )
+        self.lang_combo.grid(row=0, column=2, sticky="e", **pad)
+        self.lang_combo.bind("<<ComboboxSelected>>", self._on_language_change)
+
         # URL
-        ttk.Label(frm, text="Ссылка на видео:").grid(row=0, column=0, sticky="w", **pad)
+        self.url_label = ttk.Label(frm)
+        self.url_label.grid(row=1, column=0, sticky="w", **pad)
         self.url_var = tk.StringVar()
         url_entry = ttk.Entry(frm, textvariable=self.url_var)
-        url_entry.grid(row=0, column=1, columnspan=2, sticky="ew", **pad)
+        url_entry.grid(row=1, column=1, columnspan=2, sticky="ew", **pad)
         url_entry.focus()
 
         # Папка
-        ttk.Label(frm, text="Папка для сохранения:").grid(row=1, column=0, sticky="w", **pad)
+        self.dir_label = ttk.Label(frm)
+        self.dir_label.grid(row=2, column=0, sticky="w", **pad)
         self.dir_var = tk.StringVar(value=str(Path.home() / "Downloads"))
-        ttk.Entry(frm, textvariable=self.dir_var).grid(row=1, column=1, sticky="ew", **pad)
-        ttk.Button(frm, text="Обзор...", command=self._choose_dir).grid(row=1, column=2, **pad)
+        ttk.Entry(frm, textvariable=self.dir_var).grid(row=2, column=1, sticky="ew", **pad)
+        self.browse_btn = ttk.Button(frm, command=self._choose_dir)
+        self.browse_btn.grid(row=2, column=2, **pad)
 
         # Битрейт
-        ttk.Label(frm, text="Качество (kbps):").grid(row=2, column=0, sticky="w", **pad)
+        self.quality_label = ttk.Label(frm)
+        self.quality_label.grid(row=3, column=0, sticky="w", **pad)
         self.quality_var = tk.StringVar(value="192")
         ttk.Combobox(
             frm,
@@ -213,28 +314,47 @@ class DownloaderApp:
             values=["128", "192", "256", "320"],
             state="readonly",
             width=8,
-        ).grid(row=2, column=1, sticky="w", **pad)
+        ).grid(row=3, column=1, sticky="w", **pad)
 
         # Кнопка скачивания
         self.download_btn = ttk.Button(
-            frm, text="Скачать", style="Accent.TButton", command=self._start_download
+            frm, style="Accent.TButton", command=self._start_download
         )
-        self.download_btn.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
+        self.download_btn.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
 
         # Прогресс
         self.progress = ttk.Progressbar(frm, mode="determinate", maximum=100)
-        self.progress.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
+        self.progress.grid(row=5, column=0, columnspan=3, sticky="ew", **pad)
 
         # Лог
-        ttk.Label(frm, text="Ход выполнения:").grid(row=5, column=0, sticky="w", **pad)
+        self.progress_label = ttk.Label(frm)
+        self.progress_label.grid(row=6, column=0, sticky="w", **pad)
         self.log = tk.Text(
             frm, height=10, wrap="word", state="disabled",
             bg=DARK["surface"], fg=DARK["fg"], insertbackground=DARK["fg"],
             relief="flat", borderwidth=8, highlightthickness=1,
             highlightbackground=DARK["border"], highlightcolor=DARK["border"],
         )
-        self.log.grid(row=6, column=0, columnspan=3, sticky="nsew", **pad)
-        frm.rowconfigure(6, weight=1)
+        self.log.grid(row=7, column=0, columnspan=3, sticky="nsew", **pad)
+        frm.rowconfigure(7, weight=1)
+
+    # ---------- переключение языка ----------
+    def _on_language_change(self, event=None) -> None:
+        self.lang = "en" if self.lang_var.get() == "English" else "ru"
+        self._apply_language()
+
+    def _apply_language(self) -> None:
+        """Обновляем все подписи под текущий язык."""
+        self.root.title(self.t("title"))
+        self.lang_label.configure(text=self.t("lang_label"))
+        self.url_label.configure(text=self.t("url_label"))
+        self.dir_label.configure(text=self.t("dir_label"))
+        self.browse_btn.configure(text=self.t("browse"))
+        self.quality_label.configure(text=self.t("quality_label"))
+        self.progress_label.configure(text=self.t("progress_label"))
+        # Кнопку скачивания не трогаем во время загрузки, чтобы не сбить статус.
+        if not self.is_downloading:
+            self.download_btn.configure(text=self.t("download"))
 
     # ---------- вспомогательные действия ----------
     def _choose_dir(self) -> None:
@@ -257,31 +377,21 @@ class DownloaderApp:
         out_dir = self.dir_var.get().strip()
 
         if not url:
-            messagebox.showwarning("Нет ссылки", "Вставьте ссылку на видео.")
+            messagebox.showwarning(self.t("no_url_title"), self.t("no_url_msg"))
             return
         if not out_dir:
-            messagebox.showwarning("Нет папки", "Выберите папку для сохранения.")
+            messagebox.showwarning(self.t("no_dir_title"), self.t("no_dir_msg"))
             return
 
         ffmpeg_dir = find_ffmpeg()
         if ffmpeg_dir is None:
-            messagebox.showerror(
-                "Нет ffmpeg",
-                "Не найден ffmpeg — он нужен для конвертации в MP3.\n\n"
-                "Обычно он ставится автоматически вместе с зависимостями.\n"
-                "Если нет — установите вручную:\n"
-                "    pip install imageio-ffmpeg\n\n"
-                "Либо системный ffmpeg:\n"
-                "Windows: скачайте с gyan.dev/ffmpeg и добавьте в PATH.\n"
-                "macOS: brew install ffmpeg\n"
-                "Linux: sudo apt install ffmpeg",
-            )
+            messagebox.showerror(self.t("no_ffmpeg_title"), self.t("no_ffmpeg_msg"))
             return
 
         Path(out_dir).mkdir(parents=True, exist_ok=True)
 
         self.is_downloading = True
-        self.download_btn.configure(state="disabled", text="Скачивание...")
+        self.download_btn.configure(state="disabled", text=self.t("downloading"))
         self.progress["value"] = 0
 
         worker = threading.Thread(
@@ -302,7 +412,7 @@ class DownloaderApp:
                     pct = downloaded / total * 100
                     self.msg_queue.put(("progress", pct))
             elif d["status"] == "finished":
-                self.msg_queue.put(("log", "Загрузка завершена, конвертирую в MP3..."))
+                self.msg_queue.put(("log", self.t("converting")))
                 self.msg_queue.put(("progress", 100))
 
         opts = {
@@ -328,7 +438,7 @@ class DownloaderApp:
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-                title = info.get("title", "видео")
+                title = info.get("title", self.t("video_word"))
             self.msg_queue.put(("done", title, out_dir))
         except Exception as e:  # noqa: BLE001 — показываем любую ошибку пользователю
             self.msg_queue.put(("error", str(e)))
@@ -345,14 +455,17 @@ class DownloaderApp:
                     self._log(msg[1])
                 elif kind == "done":
                     _, title, out_dir = msg
-                    self._log(f"Готово: {title}")
-                    self._log(f"Файлы сохранены в: {out_dir}")
+                    self._log(self.t("done_log").format(title=title))
+                    self._log(self.t("saved_to").format(dir=out_dir))
                     self._finish()
-                    messagebox.showinfo("Готово", f"Скачано и сохранено:\n{title}")
+                    messagebox.showinfo(
+                        self.t("done_title"),
+                        self.t("done_msg").format(title=title),
+                    )
                 elif kind == "error":
-                    self._log(f"Ошибка: {msg[1]}")
+                    self._log(self.t("error_log").format(msg=msg[1]))
                     self._finish()
-                    messagebox.showerror("Ошибка", msg[1])
+                    messagebox.showerror(self.t("error_title"), msg[1])
         except queue.Empty:
             pass
         finally:
@@ -360,7 +473,7 @@ class DownloaderApp:
 
     def _finish(self) -> None:
         self.is_downloading = False
-        self.download_btn.configure(state="normal", text="Скачать")
+        self.download_btn.configure(state="normal", text=self.t("download"))
 
 
 def main() -> None:

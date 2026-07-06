@@ -15,3 +15,8 @@ downloads/
 # Системное
 .DS_Store
 Thumbs.db
+
+# Артефакты сборки PyInstaller
+build/
+dist/
+*.spec
