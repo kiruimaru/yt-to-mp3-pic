@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-YouTube -> MP3 + обложка. Простой графический интерфейс.
+YouTube -> MP3 + обложка. Простой графический интерфейс (тёмная тема).
 
 Окно на tkinter (входит в стандартную поставку Python):
   - поле для вставки URL видео
@@ -11,30 +11,66 @@ YouTube -> MP3 + обложка. Простой графический инте�
 
 Скачивание идёт в отдельном потоке, поэтому окно не зависает.
 
-Требования:
-    pip install -r requirements.txt
-    (ffmpeg подтягивается автоматически через пакет imageio-ffmpeg)
+Зависимости (yt-dlp, imageio-ffmpeg) при первом запуске
+доустанавливаются автоматически — вручную ничего делать не нужно.
 
 Запуск:
     python app.py
 """
 
+import importlib
 import queue
-import tempfile
 import shutil
+import subprocess
+import sys
+import tempfile
 import threading
 from pathlib import Path
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-try:
-    import yt_dlp
-except ImportError:
-    raise SystemExit(
-        "Не найден модуль yt-dlp. Установите его командой:\n"
-        "    pip install yt-dlp"
-    )
+
+# ---------- автоматическая установка зависимостей ----------
+def ensure_deps() -> None:
+    """
+    Проверяем, что нужные пакеты установлены. Чего нет — ставим через pip
+    в текущее окружение. Так пользователю не нужно вручную ничего докачивать.
+    Пары (имя пакета для pip, имя модуля для импорта).
+    """
+    required = [
+        ("yt-dlp", "yt_dlp"),
+        ("imageio-ffmpeg", "imageio_ffmpeg"),
+    ]
+    missing = []
+    for pip_name, module_name in required:
+        try:
+            importlib.import_module(module_name)
+        except ImportError:
+            missing.append(pip_name)
+
+    if not missing:
+        return
+
+    print(f"Устанавливаю недостающие пакеты: {', '.join(missing)} ...")
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--upgrade", *missing]
+        )
+    except subprocess.CalledProcessError as e:
+        raise SystemExit(
+            "Не удалось установить зависимости автоматически.\n"
+            f"Попробуйте вручную:\n    {sys.executable} -m pip install "
+            + " ".join(missing)
+            + f"\n\nОшибка: {e}"
+        )
+    # Сбрасываем кэш импортов, чтобы свежеустановленные пакеты стали видны.
+    importlib.invalidate_caches()
+
+
+ensure_deps()
+
+import yt_dlp  # noqa: E402 — импортируем уже после установки
 
 
 def find_ffmpeg():
@@ -66,12 +102,80 @@ def find_ffmpeg():
     return str(dest_dir)
 
 
+# ---------- палитра тёмной темы ----------
+DARK = {
+    "bg": "#1e1e2e",        # фон окна
+    "surface": "#282a3a",   # фон полей ввода
+    "fg": "#e4e4ef",        # основной текст
+    "muted": "#a6adc8",     # приглушённый текст
+    "accent": "#89b4fa",    # акцент (кнопка, прогресс)
+    "accent_hi": "#a6c8ff", # акцент при наведении
+    "border": "#45475a",    # рамки
+}
+
+
+def apply_dark_theme(root: tk.Tk) -> None:
+    """Настраиваем тёмную тему для ttk-виджетов на основе темы 'clam'."""
+    style = ttk.Style(root)
+    style.theme_use("clam")
+
+    root.configure(bg=DARK["bg"])
+
+    style.configure(".", background=DARK["bg"], foreground=DARK["fg"],
+                    fieldbackground=DARK["surface"], bordercolor=DARK["border"])
+    style.configure("TFrame", background=DARK["bg"])
+    style.configure("TLabel", background=DARK["bg"], foreground=DARK["fg"])
+
+    # Поля ввода
+    style.configure("TEntry", fieldbackground=DARK["surface"],
+                    foreground=DARK["fg"], insertcolor=DARK["fg"],
+                    bordercolor=DARK["border"], lightcolor=DARK["border"],
+                    darkcolor=DARK["border"])
+
+    # Выпадающий список
+    style.configure("TCombobox", fieldbackground=DARK["surface"],
+                    background=DARK["surface"], foreground=DARK["fg"],
+                    arrowcolor=DARK["fg"], bordercolor=DARK["border"])
+    style.map("TCombobox",
+              fieldbackground=[("readonly", DARK["surface"])],
+              foreground=[("readonly", DARK["fg"])])
+    root.option_add("*TCombobox*Listbox.background", DARK["surface"])
+    root.option_add("*TCombobox*Listbox.foreground", DARK["fg"])
+    root.option_add("*TCombobox*Listbox.selectBackground", DARK["accent"])
+    root.option_add("*TCombobox*Listbox.selectForeground", DARK["bg"])
+
+    # Кнопки
+    style.configure("TButton", background=DARK["surface"],
+                    foreground=DARK["fg"], bordercolor=DARK["border"],
+                    focuscolor=DARK["bg"], padding=6)
+    style.map("TButton",
+              background=[("active", DARK["border"]),
+                          ("disabled", DARK["bg"])],
+              foreground=[("disabled", DARK["muted"])])
+
+    # Акцентная кнопка "Скачать"
+    style.configure("Accent.TButton", background=DARK["accent"],
+                    foreground=DARK["bg"], padding=8)
+    style.map("Accent.TButton",
+              background=[("active", DARK["accent_hi"]),
+                          ("disabled", DARK["border"])],
+              foreground=[("disabled", DARK["muted"])])
+
+    # Прогресс-бар
+    style.configure("Horizontal.TProgressbar",
+                    background=DARK["accent"], troughcolor=DARK["surface"],
+                    bordercolor=DARK["border"], lightcolor=DARK["accent"],
+                    darkcolor=DARK["accent"])
+
+
 class DownloaderApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("YouTube -> MP3")
         self.root.geometry("640x460")
         self.root.minsize(560, 420)
+
+        apply_dark_theme(self.root)
 
         # Очередь для сообщений из рабочего потока в интерфейс.
         self.msg_queue = queue.Queue()
@@ -112,7 +216,9 @@ class DownloaderApp:
         ).grid(row=2, column=1, sticky="w", **pad)
 
         # Кнопка скачивания
-        self.download_btn = ttk.Button(frm, text="Скачать", command=self._start_download)
+        self.download_btn = ttk.Button(
+            frm, text="Скачать", style="Accent.TButton", command=self._start_download
+        )
         self.download_btn.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
 
         # Прогресс
@@ -121,7 +227,12 @@ class DownloaderApp:
 
         # Лог
         ttk.Label(frm, text="Ход выполнения:").grid(row=5, column=0, sticky="w", **pad)
-        self.log = tk.Text(frm, height=10, wrap="word", state="disabled")
+        self.log = tk.Text(
+            frm, height=10, wrap="word", state="disabled",
+            bg=DARK["surface"], fg=DARK["fg"], insertbackground=DARK["fg"],
+            relief="flat", borderwidth=8, highlightthickness=1,
+            highlightbackground=DARK["border"], highlightcolor=DARK["border"],
+        )
         self.log.grid(row=6, column=0, columnspan=3, sticky="nsew", **pad)
         frm.rowconfigure(6, weight=1)
 
@@ -157,9 +268,10 @@ class DownloaderApp:
             messagebox.showerror(
                 "Нет ffmpeg",
                 "Не найден ffmpeg — он нужен для конвертации в MP3.\n\n"
-                "Проще всего установить его вместе с зависимостями:\n"
-                "    pip install -r requirements.txt\n\n"
-                "Либо вручную:\n"
+                "Обычно он ставится автоматически вместе с зависимостями.\n"
+                "Если нет — установите вручную:\n"
+                "    pip install imageio-ffmpeg\n\n"
+                "Либо системный ffmpeg:\n"
                 "Windows: скачайте с gyan.dev/ffmpeg и добавьте в PATH.\n"
                 "macOS: brew install ffmpeg\n"
                 "Linux: sudo apt install ffmpeg",
