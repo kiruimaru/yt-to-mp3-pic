@@ -1,4 +1,5 @@
-<img width="642" height="532" alt="image" src="https://github.com/user-attachments/assets/bede6015-c2a5-4b98-be4b-1f1658aff824" />
+<img width="642" height="572" alt="image" src="https://github.com/user-attachments/assets/331114e5-b624-4d9d-b771-dfba6453fbe4" />
+
 
 # YouTube → MP3
 
