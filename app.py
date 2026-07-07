@@ -123,7 +123,10 @@ TEXTS = {
     "ru": {
         "title": "YouTube -> MP3",
         "lang_label": "Язык:",
+        "source_label": "Источник:",
         "url_label": "Ссылка на видео:",
+        "url_hint_youtube": "Вставьте ссылку на видео YouTube",
+        "url_hint_soundcloud": "Вставьте ссылку на трек SoundCloud",
         "dir_label": "Папка для сохранения:",
         "browse": "Обзор...",
         "quality_label": "Качество (kbps):",
@@ -132,6 +135,8 @@ TEXTS = {
         "progress_label": "Ход выполнения:",
         "no_url_title": "Нет ссылки",
         "no_url_msg": "Вставьте ссылку на видео.",
+        "wrong_source_title": "Проверьте источник",
+        "wrong_source_msg": "Похоже, ссылка не от {source}. Всё равно попробовать скачать?",
         "no_dir_title": "Нет папки",
         "no_dir_msg": "Выберите папку для сохранения.",
         "no_ffmpeg_title": "Нет ffmpeg",
@@ -157,7 +162,10 @@ TEXTS = {
     "en": {
         "title": "YouTube -> MP3",
         "lang_label": "Language:",
+        "source_label": "Source:",
         "url_label": "Video URL:",
+        "url_hint_youtube": "Paste a YouTube video URL",
+        "url_hint_soundcloud": "Paste a SoundCloud track URL",
         "dir_label": "Save to folder:",
         "browse": "Browse...",
         "quality_label": "Quality (kbps):",
@@ -166,6 +174,8 @@ TEXTS = {
         "progress_label": "Progress:",
         "no_url_title": "No link",
         "no_url_msg": "Paste a video URL.",
+        "wrong_source_title": "Check the source",
+        "wrong_source_msg": "This link does not look like a {source} link. Try downloading anyway?",
         "no_dir_title": "No folder",
         "no_dir_msg": "Choose a folder to save to.",
         "no_ffmpeg_title": "ffmpeg not found",
@@ -250,8 +260,8 @@ class DownloaderApp:
         self.root = root
         self.lang = "ru"  # язык по умолчанию
 
-        self.root.geometry("640x500")
-        self.root.minsize(560, 460)
+        self.root.geometry("640x540")
+        self.root.minsize(560, 500)
 
         apply_dark_theme(self.root)
 
@@ -288,25 +298,39 @@ class DownloaderApp:
         self.lang_combo.grid(row=0, column=2, sticky="e", **pad)
         self.lang_combo.bind("<<ComboboxSelected>>", self._on_language_change)
 
+        # Источник (YouTube / SoundCloud)
+        self.source_label = ttk.Label(frm)
+        self.source_label.grid(row=1, column=0, sticky="w", **pad)
+        self.source_var = tk.StringVar(value="YouTube")
+        self.source_combo = ttk.Combobox(
+            frm,
+            textvariable=self.source_var,
+            values=["YouTube", "SoundCloud"],
+            state="readonly",
+            width=14,
+        )
+        self.source_combo.grid(row=1, column=1, sticky="w", **pad)
+        self.source_combo.bind("<<ComboboxSelected>>", self._on_source_change)
+
         # URL
         self.url_label = ttk.Label(frm)
-        self.url_label.grid(row=1, column=0, sticky="w", **pad)
+        self.url_label.grid(row=2, column=0, sticky="w", **pad)
         self.url_var = tk.StringVar()
         url_entry = ttk.Entry(frm, textvariable=self.url_var)
-        url_entry.grid(row=1, column=1, columnspan=2, sticky="ew", **pad)
+        url_entry.grid(row=2, column=1, columnspan=2, sticky="ew", **pad)
         url_entry.focus()
 
         # Папка
         self.dir_label = ttk.Label(frm)
-        self.dir_label.grid(row=2, column=0, sticky="w", **pad)
+        self.dir_label.grid(row=3, column=0, sticky="w", **pad)
         self.dir_var = tk.StringVar(value=str(Path.home() / "Downloads"))
-        ttk.Entry(frm, textvariable=self.dir_var).grid(row=2, column=1, sticky="ew", **pad)
+        ttk.Entry(frm, textvariable=self.dir_var).grid(row=3, column=1, sticky="ew", **pad)
         self.browse_btn = ttk.Button(frm, command=self._choose_dir)
-        self.browse_btn.grid(row=2, column=2, **pad)
+        self.browse_btn.grid(row=3, column=2, **pad)
 
         # Битрейт
         self.quality_label = ttk.Label(frm)
-        self.quality_label.grid(row=3, column=0, sticky="w", **pad)
+        self.quality_label.grid(row=4, column=0, sticky="w", **pad)
         self.quality_var = tk.StringVar(value="192")
         ttk.Combobox(
             frm,
@@ -314,40 +338,49 @@ class DownloaderApp:
             values=["128", "192", "256", "320"],
             state="readonly",
             width=8,
-        ).grid(row=3, column=1, sticky="w", **pad)
+        ).grid(row=4, column=1, sticky="w", **pad)
 
         # Кнопка скачивания
         self.download_btn = ttk.Button(
             frm, style="Accent.TButton", command=self._start_download
         )
-        self.download_btn.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
+        self.download_btn.grid(row=5, column=0, columnspan=3, sticky="ew", **pad)
 
         # Прогресс
         self.progress = ttk.Progressbar(frm, mode="determinate", maximum=100)
-        self.progress.grid(row=5, column=0, columnspan=3, sticky="ew", **pad)
+        self.progress.grid(row=6, column=0, columnspan=3, sticky="ew", **pad)
 
         # Лог
         self.progress_label = ttk.Label(frm)
-        self.progress_label.grid(row=6, column=0, sticky="w", **pad)
+        self.progress_label.grid(row=7, column=0, sticky="w", **pad)
         self.log = tk.Text(
             frm, height=10, wrap="word", state="disabled",
             bg=DARK["surface"], fg=DARK["fg"], insertbackground=DARK["fg"],
             relief="flat", borderwidth=8, highlightthickness=1,
             highlightbackground=DARK["border"], highlightcolor=DARK["border"],
         )
-        self.log.grid(row=7, column=0, columnspan=3, sticky="nsew", **pad)
-        frm.rowconfigure(7, weight=1)
+        self.log.grid(row=8, column=0, columnspan=3, sticky="nsew", **pad)
+        frm.rowconfigure(8, weight=1)
 
     # ---------- переключение языка ----------
     def _on_language_change(self, event=None) -> None:
         self.lang = "en" if self.lang_var.get() == "English" else "ru"
         self._apply_language()
 
+    def _on_source_change(self, event=None) -> None:
+        """Меняем подсказку в поле URL под выбранный источник."""
+        self._apply_language()
+
     def _apply_language(self) -> None:
         """Обновляем все подписи под текущий язык."""
         self.root.title(self.t("title"))
         self.lang_label.configure(text=self.t("lang_label"))
-        self.url_label.configure(text=self.t("url_label"))
+        self.source_label.configure(text=self.t("source_label"))
+        # Подпись поля URL зависит от выбранного источника.
+        if self.source_var.get() == "SoundCloud":
+            self.url_label.configure(text=self.t("url_hint_soundcloud"))
+        else:
+            self.url_label.configure(text=self.t("url_hint_youtube"))
         self.dir_label.configure(text=self.t("dir_label"))
         self.browse_btn.configure(text=self.t("browse"))
         self.quality_label.configure(text=self.t("quality_label"))
@@ -382,6 +415,21 @@ class DownloaderApp:
         if not out_dir:
             messagebox.showwarning(self.t("no_dir_title"), self.t("no_dir_msg"))
             return
+
+        # Мягкая проверка: ссылка похожа на выбранный источник?
+        source = self.source_var.get()
+        low = url.lower()
+        looks_ok = (
+            (source == "YouTube" and ("youtube.com" in low or "youtu.be" in low))
+            or (source == "SoundCloud" and "soundcloud.com" in low)
+        )
+        if not looks_ok:
+            proceed = messagebox.askyesno(
+                self.t("wrong_source_title"),
+                self.t("wrong_source_msg").format(source=source),
+            )
+            if not proceed:
+                return
 
         ffmpeg_dir = find_ffmpeg()
         if ffmpeg_dir is None:
