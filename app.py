@@ -106,15 +106,17 @@ def find_ffmpeg():
     return str(dest_dir)
 
 
-# ---------- палитра тёмной темы ----------
+# ---------- палитра тёмной темы (современный дизайн) ----------
 DARK = {
-    "bg": "#1e1e2e",        # фон окна
-    "surface": "#282a3a",   # фон полей ввода
-    "fg": "#e4e4ef",        # основной текст
-    "muted": "#a6adc8",     # приглушённый текст
-    "accent": "#89b4fa",    # акцент (кнопка, прогресс)
-    "accent_hi": "#a6c8ff", # акцент при наведении
-    "border": "#45475a",    # рамки
+    "bg": "#0d1117",        # фон окна (GitHub dark)
+    "surface": "#161b22",   # фон полей ввода
+    "fg": "#c9d1d9",        # основной текст
+    "muted": "#8b949e",     # приглушённый текст
+    "accent": "#58a6ff",    # акцент (синий GitHub)
+    "accent_hi": "#79c0ff", # акцент при наведении
+    "border": "#30363d",    # рамки
+    "success": "#3fb950",   # успех (зелёный)
+    "error": "#f85149",     # ошибка (красный)
 }
 
 
@@ -471,6 +473,17 @@ class DownloaderApp:
             "quiet": True,
             "no_warnings": True,
             "ffmpeg_location": ffmpeg_dir,
+            # Обход блокировок 403 YouTube
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "web"],
+                    "player_skip": ["webpage", "configs"],
+                }
+            },
+            # User-Agent для обхода блокировок
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",

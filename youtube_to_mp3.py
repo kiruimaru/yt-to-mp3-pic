@@ -101,7 +101,7 @@ def find_ffmpeg():
 
 
 def build_options(output_dir: Path, quality: str, ffmpeg_dir: str) -> dict:
-    """Формируем настройки yt-dlp."""
+    """Формируем настройки yt-dlp с обходом блокировок YouTube."""
     output_dir.mkdir(parents=True, exist_ok=True)
     return {
         # Берём лучший звук.
@@ -112,6 +112,17 @@ def build_options(output_dir: Path, quality: str, ffmpeg_dir: str) -> dict:
         "ffmpeg_location": ffmpeg_dir,
         # Скачиваем обложку отдельным файлом.
         "writethumbnail": True,
+        # Обход блокировок 403
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"],
+                "player_skip": ["webpage", "configs"],
+            }
+        },
+        # User-Agent для обхода блокировок
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
         "postprocessors": [
             # 1. Конвертируем звук в MP3.
             {
