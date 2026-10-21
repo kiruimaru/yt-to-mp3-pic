@@ -1,8 +1,5 @@
 ![YouTube to MP3 Banner](https://capsule-render.vercel.app/api?type=waving&height=250&color=0:0d1117,100:161b22&text=YouTube%20→%20MP3&fontSize=75&fontColor=58a6ff&animation=fadeIn&desc=Download%20music%20with%20cover%20art%20|%20Cross-platform&descSize=18&descAlignY=70)
 
-<img width="642" height="572" alt="image" src="https://github.com/user-attachments/assets/331114e5-b624-4d9d-b771-dfba6453fbe4" />
-
-
 # YouTube → MP3
 
 Скачивает аудио с **YouTube** и **SoundCloud**, конвертирует в MP3 и сохраняет обложку.
