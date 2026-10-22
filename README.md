@@ -1,5 +1,8 @@
 ![YouTube to MP3 Banner](https://capsule-render.vercel.app/api?type=waving&height=250&color=0:0d1117,100:161b22&text=YouTube%20→%20MP3&fontSize=75&fontColor=58a6ff&animation=fadeIn&desc=Download%20music%20with%20cover%20art%20|%20Cross-platform&descSize=18&descAlignY=70)
 
+# EOL(End-Of-Life) Project
+Эта версия yt-to-mp3-pic более не развивается и находится в режиме EOL (End-Of-Life). Никаких новых функций больше не будет. В данный момент я занимаюсь [другим проектом](https://github.com/kiruimaru/FLACORE), на базе этого и развиваться будет только он, все наработки из этого всё так же отпускаются по MIT лицензии(можно использовать и в коммерческих целях, специально для Mei Music и других авторов).
+
 # YouTube → MP3
 
 Скачивает аудио с **YouTube** и **SoundCloud**, конвертирует в MP3 и сохраняет обложку.
